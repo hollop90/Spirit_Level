@@ -27,9 +27,12 @@ MPU6050 mpu;
 NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-  int distance;
-  unsigned long sonarInterval = 50;
-  unsigned long lastPingTime;
+int menuState = 0;
+
+// Distance sensor vars
+int distance;
+unsigned long sonarInterval = 50;
+unsigned long lastPingTime;
 
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
@@ -50,6 +53,9 @@ float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gra
 void mpu_setup();
 void updateOrientation();
 void getDistance();
+
+void menu0();
+void menu1();
 
 void setup()
 {
@@ -81,7 +87,24 @@ void loop()
     distance = sonar.ping_cm();
     lastPingTime = millis();
   }
-
+  switch (menuState)
+  {
+  case 0:
+    menu0();
+    break;
+  case 1:
+    menu1();
+    break;
+  
+  default:
+    break;
+  }
+  delay(1000);
+  menuState++;
+  if (menuState > 1)
+  {
+    menuState = 0;
+  }
   #ifdef OUTPUT_DEBUG
     Serial.print(F("Dist: "));
     Serial.print(distance);
@@ -172,4 +195,36 @@ void updateOrientation()
     mpu.dmpGetGravity(&gravity, &q);
     mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
   }
+}
+
+void menu0()
+{
+  static bool Initialization = false;
+
+  if(millis() - lastPingTime >= sonarInterval) // Measure distance every 50ms
+  {
+    distance = sonar.ping_cm();
+    lastPingTime = millis();
+  }
+  updateOrientation();
+  if(!Initialization)
+  {
+    lcd.clear();
+    lcd.print("Dist:00");
+    lcd.setCursor(0, 1);
+    lcd.print("Anlge:000");
+    lcd.print((char)0xDF); // Degree symbol
+    Initialization = true;
+  }
+}
+
+void menu1()
+{
+  
+}
+
+void rangeError()
+{
+  lcd.clear();
+  lcd.print("Range Error");
 }
