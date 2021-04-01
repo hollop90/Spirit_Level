@@ -70,6 +70,7 @@ void setup()
 
   delay(500);
   lcd.clear();
+  //test change
 }
 
 void loop()
