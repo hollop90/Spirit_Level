@@ -199,7 +199,7 @@ void updateOrientation()
 
 void menu0()
 {
-  static bool Initialization = false;
+  static bool Initialization = false; //this is supposed to make the init function only get called once
 
   if(millis() - lastPingTime >= sonarInterval) // Measure distance every 50ms
   {
