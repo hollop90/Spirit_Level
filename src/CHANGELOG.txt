@@ -1,0 +1,4 @@
+31st Mar 2021 (~8PM):  I'm trying to get the DMP output to work
+31st Mar 2021 (23:20): I have the ultrasoinc distance sensor and the DMP outputting to serial at the same time.
+    I'm not checking if there is a FIFO overflow because it does not matter more my use case.
+1st Apr 2021: I am beginning to make the LCD interface
