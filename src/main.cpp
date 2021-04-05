@@ -5,11 +5,9 @@
 // CREATED  11/02/2021
 //----------------------------------------
 #include <Arduino.h>
-#include "I2Cdev.h"
-#include "MPU6050_6Axis_MotionApps20.h" // MPU60 DMP Library
 #include "NewPing.h"
 #include "LiquidCrystal_I2C.h"
-
+#include <MPU6050_light.h>
 #include <Button Lib.h>
 
 //#define IMU_DEBUG
@@ -25,9 +23,12 @@
 #define ECHO_PIN     4  
 #define MAX_DISTANCE 200
 
-MPU6050 mpu;
 NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
+MPU6050 mpu(Wire);
+int x;
+int y;
+int z;
 
 bool singlePress = true;
 bool switchMenu = false;
@@ -47,30 +48,14 @@ int distance;
 int distanceBuff;
 unsigned long sonarInterval = 50;
 unsigned long lastPingTime;
-
-// MPU control/status vars
-bool dmpReady = false;  // set true if DMP init was successful
-uint8_t mpuIntStatus;   // holds actual interrupt status byte from MPU
-uint8_t devStatus;      // return status after each device operation (0 = success, !0 = error)
-uint16_t packetSize;    // expected DMP packet size (default is 42 bytes)
-uint16_t fifoCount;     // count of all bytes currently in FIFO
-uint8_t fifoBuffer[64]; // FIFO storage buffer
-
-// orientation/motion vars
-Quaternion q;           // [w, x, y, z]         quaternion container
-VectorInt16 aa;         // [x, y, z]            accel sensor measurements
-VectorInt16 aaReal;     // [x, y, z]            gravity-free accel sensor measurements
-VectorInt16 aaWorld;    // [x, y, z]            world-frame accel sensor measurements
-VectorFloat gravity;    // [x, y, z]            gravity vector
-float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
-
-void mpu_setup();
-void updateOrientation();
 void getDistance();
+
+int angleBuff = 0;
 
 void setup()
 {
   Serial.begin(115200);
+  mpu.begin();
 
   lcd.init();
   lcd.backlight();
@@ -80,12 +65,11 @@ void setup()
   lcd.print("& Rangefinder");
 
   Serial.println(F("Spirit level with distance meeasurment")); 
-  Serial.println(F("Setting up IMU..."));
-  mpu_setup();
 
   pinMode(12, OUTPUT); // Status LEDs
   pinMode(13, OUTPUT);
 
+  mpu.calcOffsets();
   Serial.println(F("Setup complete"));
 
   delay(500);
@@ -94,7 +78,11 @@ void setup()
 
 void loop()
 {
-  //updateOrientation(); // Get orientation froM IMU
+  mpu.update();
+  x = mpu.getAngleX();
+  y = mpu.getAngleY();
+  z = mpu.getAngleZ();
+  
   if(millis() - lastPingTime >= sonarInterval) // Measure distance every 50ms
   {
     distance = sonar.ping_cm();
@@ -146,85 +134,6 @@ void loop()
   #endif
 }
 
-void mpu_setup()
-{
-  Wire.begin();
-  Wire.setClock(400000); // 400kHz I2C clock. Comment this line if having compilation difficulties
-
-  // initialize device
-  #ifdef IMU_DEBUG
-    Serial.println(F("Initializing I2C devices..."));
-  #endif
-  mpu.initialize();
-  pinMode(INTERRUPT_PIN, INPUT);
-
-  // verify connection
-  #ifdef  IMU_DEBUG
-    Serial.println(F("Testing device connections..."));
-    Serial.println(mpu.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
-  #endif
-
-  // load and configure the DMP
-  #ifdef IMU_DEBUG
-    Serial.println(F("Initializing DMP..."));
-    devStatus = mpu.dmpInitialize();
-  #endif
-
-  // supply your own gyro offsets here, scaled for min sensitivity
-  mpu.setXGyroOffset(0);
-  mpu.setYGyroOffset(0);
-  mpu.setZGyroOffset(0);
-  mpu.setZAccelOffset(0); // 1688 factory default for my test chip
-
-  // make sure it worked (returns 0 if so)
-  if (devStatus == 0) {
-    // Calibration Time: generate offsets and calibrate our MPU6050
-    mpu.CalibrateAccel(6);
-    mpu.CalibrateGyro(6);
-    // turn on the DMP, now that it's ready
-    #ifdef IMU_DEBUG
-      Serial.println(F("Enabling DMP..."));
-    #endif
-    mpu.setDMPEnabled(true);
-
-    // enable Arduino interrupt detection
-    #ifdef IMU_DEBUG
-      Serial.println(F("Enabling interrupt detection (Arduino external interrupt 0)... EDIT: Interrupt is not used in this program"));
-    #endif
-    //attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), dmpDataReady, RISING);
-    mpuIntStatus = mpu.getIntStatus();
-
-    // set our DMP Ready flag so the main loop() function knows it's okay to use it
-    #ifdef IMU_DEBUG
-      Serial.println(F("DMP ready! Waiting for first interrupt..."));
-    #endif  
-    dmpReady = true;
-
-    // get expected DMP packet size for later comparison
-    packetSize = mpu.dmpGetFIFOPacketSize();
-  } else {
-    // ERROR!
-    // 1 = initial memory load failed
-    // 2 = DMP configuration updates failed
-    // (if it's going to break, usually the code will be 1)
-    #ifdef IMU_DEBUG
-      Serial.print(F("DMP Initialization failed (code "));
-      Serial.print(devStatus);
-      Serial.println(F(")"));
-    #endif  
-  }
-}
-
-void updateOrientation()
-{
-  if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer))
-  {
-    mpu.dmpGetQuaternion(&q, fifoBuffer);
-    mpu.dmpGetGravity(&gravity, &q);
-    mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-  }
-}
-
 void menu0() // Distance and angle screen
 {
   if(!init0)
@@ -251,6 +160,13 @@ void menu0() // Distance and angle screen
   lcd.print(abs(distanceBuff)/100 % 10); // print second digit
   lcd.print(abs(distanceBuff)/10 % 10); // print third digit
   lcd.print("cm  ");
+
+  angleBuff = x * 10;
+  lcd.setCursor(6, 1);
+  lcd.print(abs(angleBuff)/1000); // print first digit
+  lcd.print(abs(angleBuff)/100 % 10); // print second digit
+  lcd.print(abs(angleBuff)/10 % 10); // print third digit
+  lcd.print((char)0xDF);
 }
 
 void menu1()
