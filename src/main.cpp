@@ -1,34 +1,39 @@
 //----------------------------------------
 // TITLE  Spirit Level Rev 2
 // AUTHOR Ugochukwu Uzoukwu
-// VERSION  0.1
 // CREATED  11/02/2021
 //----------------------------------------
+
+//##############################
+// PREPROCESSOR DIRECTIVES
+//##############################
 #include <Arduino.h>
 #include "NewPing.h"
 #include "LiquidCrystal_I2C.h"
 #include <MPU6050_light.h>
 #include <Button Lib.h>
 
-//#define IMU_DEBUG
 #define OUTPUT_DEBUG
-
-#if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
-#include "Wire.h"
-#endif
-
-#define INTERRUPT_PIN 2 // use pin 15 on ESP8266
-
+#define STATUS_PIN 13
+#define INTERRUPT_PIN 2
 #define TRIGGER_PIN  5  
 #define ECHO_PIN     4  
 #define MAX_DISTANCE 200
 
+//##############################
+// NEW OBJECTS
+//##############################
 NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 MPU6050 mpu(Wire);
+Button switchA(6, true);
+
+//##############################
+// VARIABLE DECLARATIONS 
+//##############################
 int x;
 int y;
-int z;
+int angleBuff = 0;
 
 bool singlePress = true;
 bool switchMenu = false;
@@ -37,27 +42,28 @@ int menuState = 0;
 bool init0 = false;
 bool init1 = false;
 
-void menu0();
-void menu1();
-void rangeError();
-
-Button switchA(6, true);
-
 // Distance sensor vars
 int distance;
 int distanceBuff;
 unsigned long sonarInterval = 50;
 unsigned long lastPingTime;
+
+//##############################
+// FUNCITON PROTOTYPES
+//##############################
 void getDistance();
+void menu0();
+void menu1();
+void rangeError();
 
-int angleBuff = 0;
-
+//##########
+// SETUP
+//##########
 void setup()
 {
   Serial.begin(115200);
-  mpu.begin();
-
   lcd.init();
+
   lcd.backlight();
   lcd.setCursor(2, 0);
   lcd.print("Spirit Level");
@@ -67,21 +73,24 @@ void setup()
   Serial.println(F("Spirit level with distance meeasurment")); 
 
   pinMode(12, OUTPUT); // Status LEDs
-  pinMode(13, OUTPUT);
-
-  mpu.calcOffsets();
+  pinMode(STATUS_PIN, OUTPUT);
+  
   Serial.println(F("Setup complete"));
 
   delay(500);
   lcd.clear();
+  mpu.begin();
+  mpu.calcOffsets();
 }
 
+//##########
+// LOOP
+//##########
 void loop()
 {
   mpu.update();
   x = mpu.getAngleX();
   y = mpu.getAngleY();
-  z = mpu.getAngleZ();
   
   if(millis() - lastPingTime >= sonarInterval) // Measure distance every 50ms
   {
@@ -93,7 +102,6 @@ void loop()
   if (switchA.getButtonState() == LOW && singlePress == true){
     singlePress = false;
     switchMenu = true;
-    //menuState++;
   }else if (switchA.getButtonState() == HIGH){
     singlePress = true;
   }
@@ -118,22 +126,18 @@ void loop()
   }
 
   #ifdef OUTPUT_DEBUG
-    /*Serial.print(F("Dist: "));
+    Serial.print(F("Dist: "));
     Serial.print(distance);
     Serial.print("  ");
-    Serial.print(F("Yaw, Pitch, Roll: "));
-    Serial.print(ypr[0] * 180/M_PI);
-    Serial.print("  ");
-    Serial.print(ypr[1] * 180/M_PI);
-    Serial.print("  ");
-    Serial.print(ypr[2] * 180/M_PI);*/
-
-    Serial.print("Menu: ");
-    Serial.println(menuState);
+    Serial.print(F("Angle: "));
+    Serial.println(mpu.getAngleX());
     //delay(100);
   #endif
 }
 
+//##############################
+// FUNCTION DEFINTIONS
+//##############################
 void menu0() // Distance and angle screen
 {
   if(!init0)
@@ -154,6 +158,13 @@ void menu0() // Distance and angle screen
     menuState++;
   }
 
+  if (mpu.getAngleX() > -1 && mpu.getAngleX() < 1)
+  {
+    digitalWrite(STATUS_PIN, HIGH);
+  }else{
+    digitalWrite(STATUS_PIN, LOW);
+  }
+  
   distanceBuff = distance * 10;
   lcd.setCursor(5, 0);
   lcd.print(abs(distanceBuff)/1000); // print first digit
@@ -161,8 +172,14 @@ void menu0() // Distance and angle screen
   lcd.print(abs(distanceBuff)/10 % 10); // print third digit
   lcd.print("cm  ");
 
-  angleBuff = x * 10;
+  angleBuff = mpu.getAngleX() * 10;
   lcd.setCursor(6, 1);
+  if(mpu.getAngleX() < 0)
+  {
+    lcd.print("-");
+  }else{
+    lcd.print("+");
+  }
   lcd.print(abs(angleBuff)/1000); // print first digit
   lcd.print(abs(angleBuff)/100 % 10); // print second digit
   lcd.print(abs(angleBuff)/10 % 10); // print third digit
