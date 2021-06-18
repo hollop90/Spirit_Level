@@ -27,6 +27,7 @@ NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 MPU6050 mpu(Wire);
 Button switchA(6, true);
+Button switchB(7, true);
 
 //##############################
 // VARIABLE DECLARATIONS 
@@ -35,8 +36,15 @@ int x;
 int y;
 int angleBuff = 0;
 
-bool singlePress = true;
+byte zoom;
+bool updateScreen = true;
+
+// Button vars
+bool lastButtonStateA = HIGH;
+bool lastButtonStateB = HIGH;
+
 bool switchMenu = false;
+bool menuFunction = false;
 int menuState = 0;
 
 bool init0 = false;
@@ -47,6 +55,9 @@ int distance;
 int distanceBuff;
 unsigned long sonarInterval = 50;
 unsigned long lastPingTime;
+
+unsigned long buzzerInterval = 500;
+unsigned long lastBuzzTime;
 
 //##############################
 // FUNCITON PROTOTYPES
@@ -69,7 +80,6 @@ void setup()
   lcd.print("Spirit Level");
   lcd.setCursor(1, 1);
   lcd.print("& Rangefinder");
-
   Serial.println(F("Spirit level with distance meeasurment")); 
 
   pinMode(12, OUTPUT); // Status LEDs
@@ -80,6 +90,7 @@ void setup()
   delay(500);
   lcd.clear();
   mpu.begin();
+  digitalWrite(12, HIGH);
   mpu.calcOffsets();
 }
 
@@ -98,12 +109,25 @@ void loop()
     lastPingTime = millis();
   }
 
+  if(millis() - lastBuzzTime >= buzzerInterval) // Measure distance every 50ms
+  {
+    digitalWrite(12, !(digitalRead(12)));
+    lastBuzzTime = millis();
+  }
+
   // put your main code here, to run repeatedly:
-  if (switchA.getButtonState() == LOW && singlePress == true){
-    singlePress = false;
+  if (switchA.getButtonState() == LOW && lastButtonStateA == HIGH){
+    lastButtonStateA = LOW;
     switchMenu = true;
   }else if (switchA.getButtonState() == HIGH){
-    singlePress = true;
+    lastButtonStateA = HIGH;
+  }
+
+  if (switchB.getButtonState() == LOW && lastButtonStateB == HIGH){
+    lastButtonStateB = LOW;
+    menuFunction = true;
+  }else if (switchB.getButtonState() == HIGH){
+    lastButtonStateB = HIGH;
   }
 
   switch(menuState)
@@ -147,6 +171,8 @@ void menu0() // Distance and angle screen
     lcd.setCursor(0, 1);
     lcd.print("Anlge:000");
     lcd.print((char)0xDF); // Degree symbol
+    menuFunction = false;
+    updateScreen = true;
     init0 = true;
   }
 
@@ -158,6 +184,12 @@ void menu0() // Distance and angle screen
     menuState++;
   }
 
+  if(menuFunction == true && menuState == 0)
+  {
+    menuFunction = false;
+    updateScreen = !updateScreen;
+  }
+
   if (mpu.getAngleX() > -1 && mpu.getAngleX() < 1)
   {
     digitalWrite(STATUS_PIN, HIGH);
@@ -165,25 +197,29 @@ void menu0() // Distance and angle screen
     digitalWrite(STATUS_PIN, LOW);
   }
   
-  distanceBuff = distance * 10;
-  lcd.setCursor(5, 0);
-  lcd.print(abs(distanceBuff)/1000); // print first digit
-  lcd.print(abs(distanceBuff)/100 % 10); // print second digit
-  lcd.print(abs(distanceBuff)/10 % 10); // print third digit
-  lcd.print("cm  ");
-
-  angleBuff = mpu.getAngleX() * 10;
-  lcd.setCursor(6, 1);
-  if(mpu.getAngleX() < 0)
+  // Hold the values on screen
+  if (updateScreen == true)
   {
-    lcd.print("-");
-  }else{
-    lcd.print("+");
-  }
-  lcd.print(abs(angleBuff)/1000); // print first digit
-  lcd.print(abs(angleBuff)/100 % 10); // print second digit
-  lcd.print(abs(angleBuff)/10 % 10); // print third digit
-  lcd.print((char)0xDF);
+    distanceBuff = distance * 10;
+    lcd.setCursor(5, 0);
+    lcd.print(abs(distanceBuff)/1000); // print first digit
+    lcd.print(abs(distanceBuff)/100 % 10); // print second digit
+    lcd.print(abs(distanceBuff)/10 % 10); // print third digit
+    lcd.print("cm  ");
+
+    angleBuff = mpu.getAngleX() * 10;
+    lcd.setCursor(6, 1);
+    if(mpu.getAngleX() < 0)
+    {
+      lcd.print("-");
+    }else{
+      lcd.print("+");
+    }
+    lcd.print(abs(angleBuff)/1000); // print first digit
+    lcd.print(abs(angleBuff)/100 % 10); // print second digit
+    lcd.print(abs(angleBuff)/10 % 10); // print third digit
+    lcd.print((char)0xDF);
+  }  
 }
 
 void menu1()
@@ -191,9 +227,9 @@ void menu1()
   if(!init1)
   {
     lcd.clear();
-    lcd.print("Boop:123cm");
+    lcd.print("A:   cm B:   cm");
     lcd.setCursor(0, 1);
-    lcd.print("Apple:456");
+    lcd.print("Area:");
     lcd.print((char)0xDF); // Degree symbol
     init1 = true;
   }
@@ -204,6 +240,18 @@ void menu1()
     init1 = false;
     menuState++;
   }
+
+  if(menuFunction == true && menuState == 0)
+  {
+    menuFunction = false;
+    updateScreen = !updateScreen;
+  }
+
+  distanceBuff = distance * 10;
+  lcd.setCursor(5, 0);
+  lcd.print(abs(distanceBuff)/1000); // print first digit
+  lcd.print(abs(distanceBuff)/100 % 10); // print second digit
+  lcd.print(abs(distanceBuff)/10 % 10); // print third digit
 }
 
 void rangeError()
