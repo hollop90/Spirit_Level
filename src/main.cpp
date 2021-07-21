@@ -26,33 +26,37 @@
 NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 MPU6050 mpu(Wire);
-Button switchA(6, true);
-Button switchB(7, true);
+Button switchA(8, true);
+Button switchB(9, true);
 
 //##############################
 // VARIABLE DECLARATIONS 
 //##############################
+
+// Orientation Vars
 int x;
 int y;
 int angleBuff = 0;
-
-byte zoom;
-bool updateScreen = true;
 
 // Button vars
 bool lastButtonStateA = HIGH;
 bool lastButtonStateB = HIGH;
 
+// Menu system vars
 bool switchMenu = false;
 bool menuFunction = false;
+bool updateScreen = true;
+int incArea = 0;
 int menuState = 0;
-
 bool init0 = false;
 bool init1 = false;
 
 // Distance sensor vars
 int distance;
 int distanceBuff;
+float distanceA;
+float distanceB;
+float area;
 unsigned long sonarInterval = 50;
 unsigned long lastPingTime;
 
@@ -72,26 +76,24 @@ void rangeError();
 //##########
 void setup()
 {
-  Serial.begin(115200);
-  lcd.init();
+  pinMode(STATUS_PIN, OUTPUT);
 
+  Serial.begin(115200);
+
+  lcd.init();
   lcd.backlight();
   lcd.setCursor(2, 0);
   lcd.print("Spirit Level");
   lcd.setCursor(1, 1);
   lcd.print("& Rangefinder");
-  Serial.println(F("Spirit level with distance meeasurment")); 
-
-  pinMode(12, OUTPUT); // Status LEDs
-  pinMode(STATUS_PIN, OUTPUT);
-  
-  Serial.println(F("Setup complete"));
+  Serial.println(F("Spirit level with distance meeasurment"));  
 
   delay(500);
-  lcd.clear();
   mpu.begin();
-  digitalWrite(12, HIGH);
+  digitalWrite(STATUS_PIN, LOW);
   mpu.calcOffsets();
+  Serial.println(F("Setup complete"));
+  lcd.clear();
 }
 
 //##########
@@ -109,13 +111,13 @@ void loop()
     lastPingTime = millis();
   }
 
-  if(millis() - lastBuzzTime >= buzzerInterval) // Measure distance every 50ms
+  if(millis() - lastBuzzTime >= buzzerInterval) // "Heatbeat" to show that the program is working
   {
     digitalWrite(12, !(digitalRead(12)));
     lastBuzzTime = millis();
   }
 
-  // put your main code here, to run repeatedly:
+// Polling for button A and B
   if (switchA.getButtonState() == LOW && lastButtonStateA == HIGH){
     lastButtonStateA = LOW;
     switchMenu = true;
@@ -224,14 +226,16 @@ void menu0() // Distance and angle screen
 
 void menu1()
 {
+  // Initialise the menu
   if(!init1)
   {
     lcd.clear();
     lcd.print("A:   cm B:   cm");
     lcd.setCursor(0, 1);
-    lcd.print("Area:");
-    lcd.print((char)0xDF); // Degree symbol
+    lcd.print("Area: .  ");
+    //lcd.print("m2"); // Degree symbol
     init1 = true;
+    updateScreen = false;
   }
 
   if(switchMenu == true)
@@ -241,17 +245,54 @@ void menu1()
     menuState++;
   }
 
-  if(menuFunction == true && menuState == 0)
+  if(menuFunction == true && menuState == 1)
   {
     menuFunction = false;
-    updateScreen = !updateScreen;
+    incArea++;
   }
 
-  distanceBuff = distance * 10;
-  lcd.setCursor(5, 0);
-  lcd.print(abs(distanceBuff)/1000); // print first digit
-  lcd.print(abs(distanceBuff)/100 % 10); // print second digit
-  lcd.print(abs(distanceBuff)/10 % 10); // print third digit
+  switch (incArea)
+  {
+  case 0:
+    distanceBuff = distance * 10;
+    lcd.setCursor(2, 0);
+    lcd.print(abs(distanceBuff)/1000); // print first digit
+    lcd.print(abs(distanceBuff)/100 % 10); // print second digit
+    lcd.print(abs(distanceBuff)/10 % 10); // print third digit
+    break;
+  case 1:
+    distanceA = distance;
+    incArea++;
+    break;
+  case 2:
+    distanceBuff = distance * 10;
+    lcd.setCursor(10, 0);
+    lcd.print(abs(distanceBuff)/1000); // print first digit
+    lcd.print(abs(distanceBuff)/100 % 10); // print second digit
+    lcd.print(abs(distanceBuff)/10 % 10); // print third digit
+    break;
+  case 3:
+    distanceB = distance;
+    incArea++;
+    break;
+  case 4:
+    area = distanceA*distanceB;
+    incArea++;
+    break;
+  case 5:
+    lcd.setCursor(6, 1);
+    lcd.print(area);
+    incArea++;
+  case 6:
+    delay(500);
+    if(switchB.getButtonState() == LOW)
+    {
+      init1 = false;
+      incArea = 0;
+    }
+  default:
+    break;
+  }
 }
 
 void rangeError()
