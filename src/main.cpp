@@ -156,7 +156,7 @@ void loop()
     Serial.print(distance);
     Serial.print("  ");
     Serial.print(F("Angle: "));
-    Serial.println(mpu.getAngleX());
+    Serial.println(mpu.getAngleY());
     //delay(100);
   #endif
 }
