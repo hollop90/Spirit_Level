@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Created by Tim Eckel - teckel@leethost.com
+// Created by Tim Eckel - eckel.tim@gmail.com
 //
 // See NewPing.h for license, purpose, syntax, version history, links, etc.
 // ---------------------------------------------------------------------------

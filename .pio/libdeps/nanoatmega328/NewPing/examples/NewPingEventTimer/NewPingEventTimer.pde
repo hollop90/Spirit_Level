@@ -5,7 +5,7 @@
 // an ultrasonic sensor for a possible collision while at the same time navigating. This allows a
 // properly developed sketch to multitask. Be aware that because the ping_timer method uses Timer2,
 // other features or libraries that also use Timer2 would be effected. For example, the PWM function on
-// pins 3 & 11 on Arduino Uno (pins 9 and 11 on Arduino Mega) and the Tone library. Note, only the PWM
+// pins 3 & 11 on Arduino Uno (pins 9 and 10 on Arduino Mega) and the Tone library. Note, only the PWM
 // functionality of the pins is lost (as they use Timer2 to do PWM), the pins are still available to use.
 // NOTE: For Teensy/Leonardo (ATmega32U4) the library uses Timer4 instead of Timer2.
 // ---------------------------------------------------------------------------

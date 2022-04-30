@@ -1,18 +1,18 @@
 // ---------------------------------------------------------------------------
-// NewPing Library - v1.9.1 - 07/15/2018
+// NewPing Library - v1.9.4 - 01/26/2022
 //
 // AUTHOR/LICENSE:
-// Created by Tim Eckel - teckel@leethost.com
-// Copyright 2018 License: Forks and derivitive works are NOT permitted without
+// Created by Tim Eckel - eckel.tim@gmail.com
+// Copyright 2022 License: Forks and derivitive works are NOT permitted without
 // permission. Permission is only granted to use as-is for private and
 // commercial use. If you wish to contribute, make changes, or enhancements,
-// please create a pull request. I get a TON of support issues from this
+// please create a pull request. I get a lot of support issues from this
 // library, most of which comes from old versions, buggy forks or sites without
 // proper documentation, just trying to wrangle this project together.
 //
 // LINKS:
 // Project home: https://bitbucket.org/teckel12/arduino-new-ping/wiki/Home
-// Blog: http://arduino.cc/forum/index.php/topic,106043.0.html
+// Support: https://bitbucket.org/teckel12/arduino-new-ping/issues?status=new&status=open
 //
 // DISCLAIMER:
 // This software is furnished "as is", without technical support, and with no 
@@ -60,6 +60,10 @@
 //   NewPing::timer_stop() - Stop the timer.
 //
 // HISTORY:
+// 01/26/2022 v1.9.4 - Added esp32 to the compatible architectures (note:
+//   non-timer methods only)
+// 01/20/2022 v1.9.3 - Default to disable timer methods for non-AVR
+//   microcontrollers and on the ATmega4809 used in the Nano Every.
 // 07/15/2018 v1.9.1 - Added support for ATtiny441 and ATtiny841
 //   microcontrollers.
 // 12/09/2017 v1.9.0 - Added support for the ARM-based Particle devices. If
@@ -167,15 +171,12 @@
 	#define ONE_PIN_ENABLED true    // Set to "false" to disable one pin mode which saves around 14-26 bytes of binary size. Default=true
 	#define ROUNDING_ENABLED false  // Set to "true" to enable distance rounding which also adds 64 bytes to binary size. Default=false
 	#define URM37_ENABLED false     // Set to "true" to enable support for the URM37 sensor in PWM mode. Default=false
-	#define TIMER_ENABLED true      // Set to "false" to disable the timer ISR (if getting "__vector_7" compile errors set this to false). Default=true
 
 	// Probably shouldn't change these values unless you really know what you're doing.
 	#define NO_ECHO 0               // Value returned if there's no ping echo within the specified MAX_SENSOR_DISTANCE or max_cm_distance. Default=0
 	#define MAX_SENSOR_DELAY 5800   // Maximum uS it takes for sensor to start the ping. Default=5800
 	#define ECHO_TIMER_FREQ 24      // Frequency to check for a ping echo (every 24uS is about 0.4cm accuracy). Default=24
 	#define PING_MEDIAN_DELAY 29000 // Microsecond delay between pings in the ping_median method. Default=29000
-	#define PING_OVERHEAD 5         // Ping overhead in microseconds (uS). Default=5
-	#define PING_TIMER_OVERHEAD 13  // Ping timer overhead in microseconds (uS). Default=13
 	#if URM37_ENABLED == true
 		#undef  US_ROUNDTRIP_CM
 		#undef  US_ROUNDTRIP_IN
@@ -188,25 +189,24 @@
 
 	// Detect non-AVR microcontrollers (Teensy 3.x, Arduino DUE, etc.) and don't use port registers or timer interrupts as required.
 	#if (defined (__arm__) && (defined (TEENSYDUINO) || defined (PARTICLE)))
-		#undef  PING_OVERHEAD
 		#define PING_OVERHEAD 1
-		#undef  PING_TIMER_OVERHEAD
 		#define PING_TIMER_OVERHEAD 1
+		#define TIMER_ENABLED true
 		#define DO_BITWISE true
-	#elif !defined (__AVR__)
-		#undef  PING_OVERHEAD
+	#elif defined (__AVR__)
+		#define PING_OVERHEAD 5         // Ping overhead in microseconds (uS). Default=5
+		#define PING_TIMER_OVERHEAD 13  // Ping timer overhead in microseconds (uS). Default=13
+		#define TIMER_ENABLED true
+		#define DO_BITWISE true
+	#else
 		#define PING_OVERHEAD 1
-		#undef  PING_TIMER_OVERHEAD
 		#define PING_TIMER_OVERHEAD 1
-		#undef  TIMER_ENABLED
 		#define TIMER_ENABLED false
 		#define DO_BITWISE false
-	#else
-		#define DO_BITWISE true
 	#endif
 
-	// Disable the timer interrupts when using ATmega128 and all ATtiny microcontrollers.
-	#if defined (__AVR_ATmega128__) || defined (__AVR_ATtiny24__) || defined (__AVR_ATtiny44__) || defined (__AVR_ATtiny441__) || defined (__AVR_ATtiny84__) || defined (__AVR_ATtiny841__) || defined (__AVR_ATtiny25__) || defined (__AVR_ATtiny45__) || defined (__AVR_ATtiny85__) || defined (__AVR_ATtiny261__) || defined (__AVR_ATtiny461__) || defined (__AVR_ATtiny861__) || defined (__AVR_ATtiny43U__)
+	// Disable the timer interrupts when using ATmega128, ATmega4809 and all ATtiny microcontrollers.
+	#if defined (__AVR_ATmega128__) || defined(__AVR_ATmega4809__) || defined (__AVR_ATtiny24__) || defined (__AVR_ATtiny44__) || defined (__AVR_ATtiny441__) || defined (__AVR_ATtiny84__) || defined (__AVR_ATtiny841__) || defined (__AVR_ATtiny25__) || defined (__AVR_ATtiny45__) || defined (__AVR_ATtiny85__) || defined (__AVR_ATtiny261__) || defined (__AVR_ATtiny461__) || defined (__AVR_ATtiny861__) || defined (__AVR_ATtiny43U__)
 		#undef  TIMER_ENABLED
 		#define TIMER_ENABLED false
 	#endif
